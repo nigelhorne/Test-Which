@@ -174,13 +174,17 @@ sub _parse_constraint {
 	my $spec = $_[0];
 
 	return unless defined $spec;
+
 	if ($spec =~ /^\s*(>=|<=|==|!=|>|<)\s*(\S+)\s*$/) {
 		return ($1, $2);
 	}
-	# allow bare version (==)
+	# allow bare version (implies ==)
 	if ($spec =~ /^\s*(\d+(?:\.\d+)*)\s*$/) {
 		return ('==', $1);
 	}
+
+	# If we get here, it's invalid
+	# Return empty list, but caller should provide an helpful error
 	return;
 }
 
@@ -222,7 +226,10 @@ sub _check_requirements {
 		if (defined $want) {
 			my ($op, $ver) = _parse_constraint($want);
 			unless (defined $op) {
-				push @bad_version, { name => $name, reason => "invalid constraint '$want'" };
+				push @bad_version, {
+					name => $name,
+					reason => "invalid constraint '$want' (expected format: '>=1.2.3', '>2.0', '==1.5', or '1.5')" 
+				};
 				next;
 			}
 			my $out = _capture_version_output($path);
