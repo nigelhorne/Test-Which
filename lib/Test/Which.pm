@@ -108,14 +108,33 @@ sub _extract_version {
 
 	return undef unless defined $output;
 
-	# Look for the first occurrence of a numeric dotted version e.g. 1.2 or 2020.10.1
-	if ($output =~ /([0-9]+(?:\.[0-9]+)+)/) {
+	# Look for version near the word "version"
+	# Handles: "ffmpeg version 4.2.7", "Version: 2.1.0", "ImageMagick 7.1.0-4"
+	if ($output =~ /version[:\s]+v?(\d+(?:\.\d+)+)/i) {
 		return $1;
 	}
-	# also accept single-digit like "9"
-	if ($output =~ /\b([0-9]+)\b/) {
+
+	# Look at first line (common pattern)
+	my ($first_line) = split /\n/, $output;
+	if ($first_line =~ /\b(\d+\.\d+(?:\.\d+)*)\b/) {
 		return $1;
 	}
+
+	# Any dotted version number
+	if ($output =~ /\b(\d+\.\d+(?:\.\d+)*)\b/) {
+		return $1;
+	}
+
+	# Single number near "version"
+	if ($output =~ /version[:\s]+v?(\d+)\b/i) {
+		return $1;
+	}
+
+	# Just a standalone number (least reliable)
+	if ($output =~ /\b(\d+)\b/) {
+		return $1;
+	}
+
 	return undef;
 }
 
