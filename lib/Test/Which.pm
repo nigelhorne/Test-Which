@@ -143,19 +143,30 @@ sub _version_satisfies {
 	my ($found, $op, $required) = @_;
 
 	return 0 unless defined $found;
-	# parse with version.pm
-	my $vf = eval { version::parse($found) };
-	my $vr = eval { version::parse($required) };
-	return 0 if $@;
 
-	if ($op eq '>=') { return $vf >= $vr }
-	if ($op eq '>')  { return $vf >  $vr }
-	if ($op eq '<=') { return $vf <= $vr }
-	if ($op eq '<')  { return $vf <  $vr }
-	if ($op eq '==') { return $vf == $vr }
-	if ($op eq '!=') { return $vf != $vr }
-	# fallback: equality
-	return $vf == $vr;
+	# Parse both versions, checking each separately
+	my $vf = eval { version->parse($found) };
+	if ($@) {
+		warn "Failed to parse found version '$found': $@";
+		return 0;
+	}
+
+	my $vr = eval { version->parse($required) };
+	if ($@) {
+		warn "Failed to parse required version '$required': $@";
+		return 0;
+	}
+
+	# Now do comparisons
+	if    ($op eq '>=') { return $vf >= $vr }
+	elsif ($op eq '>')  { return $vf >  $vr }
+	elsif ($op eq '<=') { return $vf <= $vr }
+	elsif ($op eq '<')  { return $vf <  $vr }
+	elsif ($op eq '==') { return $vf == $vr }
+	elsif ($op eq '!=') { return $vf != $vr }
+
+	warn "Unknown operator '$op'";
+	return 0;
 }
 
 # Parse a constraint like ">=1.2.3" into (op, ver)
