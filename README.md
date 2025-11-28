@@ -2,6 +2,10 @@
 
 Test::Which - Skip tests if external programs are missing from PATH (with version checks)
 
+# VERSION
+
+Version 0.03
+
 # SYNOPSIS
 
     use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
@@ -16,7 +20,7 @@ Test::Which - Skip tests if external programs are missing from PATH (with versio
 
 # DESCRIPTION
 
-Test::Which mirrors [Test::Needs](https://metacpan.org/pod/Test%3A%3ANeeds) but checks for executables in PATH.
+`Test::Which` mirrors [Test::Needs](https://metacpan.org/pod/Test%3A%3ANeeds) but checks for executables in PATH.
 It can also check simple version constraints using a built-in heuristic (tries --version, -version, -v, -V and extracts a dotted-number).
 If a version is requested but cannot be determined, the requirement fails.
 

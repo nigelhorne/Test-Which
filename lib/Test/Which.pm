@@ -3,8 +3,6 @@ package Test::Which;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
-
 use parent 'Exporter';
 our @ISA = qw(Exporter);
 
@@ -22,6 +20,14 @@ my $TEST = Test::Builder->new();
 
 Test::Which - Skip tests if external programs are missing from PATH (with version checks)
 
+=head1 VERSION
+
+Version 0.03
+
+=cut
+
+our $VERSION = '0.03';
+
 =head1 SYNOPSIS
 
   use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
@@ -36,7 +42,7 @@ Test::Which - Skip tests if external programs are missing from PATH (with versio
 
 =head1 DESCRIPTION
 
-Test::Which mirrors L<Test::Needs> but checks for executables in PATH.
+C<Test::Which> mirrors L<Test::Needs> but checks for executables in PATH.
 It can also check simple version constraints using a built-in heuristic (tries --version, -version, -v, -V and extracts a dotted-number).
 If a version is requested but cannot be determined, the requirement fails.
 
