@@ -7,5 +7,4 @@ use Test::Which;
 
 which_ok 'perl', { version => qr/\d+\.\d+/ };
 
-done_testing;
-
+done_testing();
