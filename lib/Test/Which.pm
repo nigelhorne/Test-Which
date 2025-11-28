@@ -16,6 +16,36 @@ our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
 my $TEST = Test::Builder->new;
 
+=head1 NAME
+
+Test::Which - Skip tests if external programs are missing from PATH (with version checks)
+
+=head1 SYNOPSIS
+
+  use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
+
+  # At runtime in a subtest or test body
+  use Test::Which qw(which_ok);
+
+  subtest 'needs ffmpeg' => sub {
+      which_ok 'ffmpeg' => '>=6.0' or return;
+      ... # tests that use ffmpeg
+  };
+
+=head1 DESCRIPTION
+
+Test::Which mirrors Test::Needs but checks for executables in PATH. It can also
+check simple version constraints using a built-in heuristic (tries --version, -version, -v, -V and extracts a dotted-number). If a version is requested but cannot be determined, the requirement fails.
+
+=head1 FUNCTIONS
+
+=head2 which_ok @programs_or_pairs
+
+Checks the named programs (with optional version constraints). If any requirement
+is not met the current test or subtest is skipped via Test::Builder.
+
+=cut
+
 # Helper: run a program with one of the version flags and capture output
 sub _capture_version_output {
     my ($path) = @_;
@@ -185,43 +215,30 @@ sub which_ok {
 
 __END__
 
-=pod
+=head1 SUPPORT
 
-=head1 NAME
-
-Test::Which - Skip tests if external programs are missing from PATH (with version checks)
-
-=head1 SYNOPSIS
-
-  use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
-
-  # At runtime in a subtest or test body
-  use Test::Which qw(which_ok);
-
-  subtest 'needs ffmpeg' => sub {
-      which_ok 'ffmpeg' => '>=6.0' or return;
-      ... # tests that use ffmpeg
-  };
-
-=head1 DESCRIPTION
-
-Test::Which mirrors Test::Needs but checks for executables in PATH. It can also
-check simple version constraints using a built-in heuristic (tries --version, -version, -v, -V and extracts a dotted-number). If a version is requested but cannot be determined, the requirement fails.
-
-=head1 FUNCTIONS
-
-=head2 which_ok @programs_or_pairs
-
-Checks the named programs (with optional version constraints). If any requirement
-is not met the current test or subtest is skipped via Test::Builder.
+This module is provided as-is without any warranty.
 
 =head1 AUTHOR
 
-You
+Nigel Horne, C<< <njh at nigelhorne.com> >>
 
-=head1 LICENSE
+=head1 LICENCE AND COPYRIGHT
 
-Same as Perl.
+Copyright 2025 Nigel Horne.
+
+Usage is subject to licence terms.
+
+The licence terms of this software are as follows:
+
+=over 4
+
+=item * Personal single user, single computer use: GPL2
+
+=item * All other users (including Commercial, Charity, Educational, Government)
+  must apply in writing for a licence for use from Nigel Horne at the
+  above e-mail.
+
+=back
 
 =cut
-

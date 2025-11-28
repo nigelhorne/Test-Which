@@ -26,10 +26,23 @@ check simple version constraints using a built-in heuristic (tries --version, -v
 Checks the named programs (with optional version constraints). If any requirement
 is not met the current test or subtest is skipped via Test::Builder.
 
+# SUPPORT
+
+This module is provided as-is without any warranty.
+
 # AUTHOR
 
-You
+Nigel Horne, `<njh at nigelhorne.com>`
 
-# LICENSE
+# LICENCE AND COPYRIGHT
 
-Same as Perl.
+Copyright 2025 Nigel Horne.
+
+Usage is subject to licence terms.
+
+The licence terms of this software are as follows:
+
+- Personal single user, single computer use: GPL2
+- All other users (including Commercial, Charity, Educational, Government)
+  must apply in writing for a licence for use from Nigel Horne at the
+  above e-mail.
