@@ -5,10 +5,11 @@ use warnings;
 
 our $VERSION = '0.02';
 
-use parent 'Exporter'; 
+use parent 'Exporter';
 our @ISA = qw(Exporter);
 
 use File::Which qw(which);
+use IPC::Run3 qw(run3);
 use version ();	# provide version->parse
 use Test::Builder;
 
@@ -73,11 +74,30 @@ sub _capture_version_output {
 	my $path = $_[0];
 
 	for my $flag (qw(--version -version -v -V)) {
-		my $cmd = qx{$path $flag 2>&1};
-		my $out = eval { local $SIG{ALRM} = sub { die 'timeout' }; qx{$cmd} };
-		next unless defined $out;
-		next if $out eq '';
-		return $out;
+		my $out;
+		my $err;
+
+		eval {
+			local $SIG{ALRM} = sub { die 'timeout' };
+			alarm(2);  # 2 second timeout
+
+			run3([$path, $flag], \undef, \$out, \$err);
+
+			alarm(0);	# Cancel alarm
+		};
+
+		if ($@) {
+			alarm(0);	# Ensure alarm is cancelled
+			next if $@ =~ /timeout/;
+			warn "Error running $path $flag: $@";
+			next;
+		}
+
+		my $output = defined $out ? $out : '';
+		$output .= defined $err ? $err : '';
+
+		next if $output eq '';
+		return $output;
 	}
 	return undef;
 }
@@ -139,11 +159,16 @@ sub _parse_constraint {
 sub _check_requirements {
 	my (@args) = @_;
 
+	die 'Odd number of arguments (expected program => constraint pairs or program names)' if @args == 0;
+
 	# Normalize into array of hashrefs: { name => ..., constraint => undef or '>=1' }
 	my @reqs;
 	while (@args) {
 		my $a = shift @args;
-		if (@args && defined $args[0] && ($args[0] =~ /^(?:>=|<=|==|!=|>|<)\s*\d/ || $args[0] =~ /^\d/)) {
+
+		die 'Program name must be defined' unless defined $a;
+
+		if (@args && defined $args[0] && ($args[0] =~ /^(?:>=|<=|==|!=|>|<)\s*\d/ || $args[0] =~ /^\d+(?:\.\d+)*$/)) {
 			my $c = shift @args;
 			push @reqs, { name => $a, constraint => $c };
 		} else {
