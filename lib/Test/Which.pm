@@ -5,7 +5,9 @@ use warnings;
 
 our $VERSION = '0.02';
 
+use parent 'Exporter'; 
 our @ISA = qw(Exporter);
+
 use File::Which qw(which);
 use version ();	# provide version->parse
 use Test::Builder;
@@ -49,9 +51,10 @@ If any requirement is not met the current test or subtest is skipped via L<Test:
 # runtime function, returns true if all present & satisfy versions, otherwise calls skip
 sub which_ok {
 	my (@args) = @_;
-	my %res = _check_requirements(@args);
-	my @missing = @{ $res{missing} };
-	my @bad = @{ $res{bad_version} };
+
+	my $res = _check_requirements(@args);
+	my @missing = @{ $res->{missing} };
+	my @bad = @{ $res->{bad_version} };
 
 	if (@missing || @bad) {
 		my @msgs;
@@ -70,7 +73,7 @@ sub _capture_version_output {
 	my $path = $_[0];
 
 	for my $flag (qw(--version -version -v -V)) {
-		my $cmd = qq{$path $flag 2>&1};
+		my $cmd = qx{$path $flag 2>&1};
 		my $out = eval { local $SIG{ALRM} = sub { die 'timeout' }; qx{$cmd} };
 		next unless defined $out;
 		next if $out eq '';
@@ -181,10 +184,10 @@ sub _check_requirements {
 		}
 	}
 
-	return (
+	return {
 		missing => \@missing,
 		bad_version => \@bad_version,
-	);
+	};
 }
 
 # import: allow compile-time checks like `use Test::Which 'prog' => '>=1.2';`
@@ -197,9 +200,9 @@ sub import {
 
 	return unless @reqs;
 
-	my %res = _check_requirements(@reqs);
-	my @missing = @{ $res{missing} };
-	my @bad = @{ $res{bad_version} };
+	my $res = _check_requirements(@reqs);
+	my @missing = @{ $res->{missing} };
+	my @bad = @{ $res->{bad_version} };
 
 	if (@missing || @bad) {
 		my @msgs;
