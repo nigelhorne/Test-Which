@@ -66,6 +66,8 @@ sub which_ok {
 		return 0;
 	}
 
+	# Actually run a passing test
+	$TEST->ok(1, 'Required programs available: ' . join(', ', map { $_->{name} } @{ $res->{checked} || [] }));
 	return 1;
 }
 
