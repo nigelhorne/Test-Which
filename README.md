@@ -25,8 +25,7 @@ If a version is requested but cannot be determined, the requirement fails.
 ## which\_ok @programs\_or\_pairs
 
 Checks the named programs (with optional version constraints).
-If any requirement
-is not met the current test or subtest is skipped via Test::Builder.
+If any requirement is not met the current test or subtest is skipped via [Test::Builder](https://metacpan.org/pod/Test%3A%3ABuilder).
 
 # SUPPORT
 

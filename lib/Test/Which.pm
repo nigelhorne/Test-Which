@@ -42,8 +42,7 @@ If a version is requested but cannot be determined, the requirement fails.
 =head2 which_ok @programs_or_pairs
 
 Checks the named programs (with optional version constraints).
-If any requirement
-is not met the current test or subtest is skipped via Test::Builder.
+If any requirement is not met the current test or subtest is skipped via L<Test::Builder>.
 
 =cut
 
@@ -72,7 +71,7 @@ sub _capture_version_output {
 
 	for my $flag (qw(--version -version -v -V)) {
 		my $cmd = qq{$path $flag 2>&1};
-		my $out = eval { local $SIG{ALRM} = sub { die "timeout" }; qx{$cmd} };
+		my $out = eval { local $SIG{ALRM} = sub { die 'timeout' }; qx{$cmd} };
 		next unless defined $out;
 		next if $out eq '';
 		return $out;
@@ -172,7 +171,7 @@ sub _check_requirements {
 			my $found = _extract_version($out);
 			unless (defined $found) {
 				# Option B chosen earlier: treat as unknown version => requirement not satisfied
-				push @bad_version, { name => $name, reason => "no version detected" };
+				push @bad_version, { name => $name, reason => 'no version detected' };
 				next;
 			}
 			unless (_version_satisfies($found, $op, $ver)) {
