@@ -3,7 +3,7 @@ package Test::Which;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.01';
 
 our @ISA = qw(Exporter);
 use File::Which qw(which);
