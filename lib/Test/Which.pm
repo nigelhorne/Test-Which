@@ -170,7 +170,7 @@ sub _check_requirements {
 			my $out = _capture_version_output($path);
 			my $found = _extract_version($out);
 			unless (defined $found) {
-				# Option B chosen earlier: treat as unknown version => requirement not satisfied
+				# Treat as unknown version => requirement not satisfied
 				push @bad_version, { name => $name, reason => 'no version detected' };
 				next;
 			}
