@@ -3,7 +3,6 @@ Revision history for Test-Which
 0.04
 	"checked" was not being set up
 	Print version found if TEST_VERBOSE is set
-	Cache the result
 	Added support for extractor
 	Added version_flag
 	Don't look in path if absolute name given

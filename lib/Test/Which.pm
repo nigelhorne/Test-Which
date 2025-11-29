@@ -7,14 +7,12 @@ use parent 'Exporter';
 our @ISA = qw(Exporter);
 
 use File::Which qw(which);
-use IPC::Run3 qw(run3);
 use version ();	# provide version->parse
 use Test::Builder;
 
 our @EXPORT_OK = qw(which_ok);
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
-my %VERSION_CACHE;
 my $TEST = Test::Builder->new();
 
 =head1 NAME
@@ -185,7 +183,7 @@ sub _capture_version_output {
 		} elsif (!ref($custom_flags)) {
 			@flags = ($custom_flags);
 		} else {
-			warn "Invalid version_flag type: " . ref($custom_flags);
+			warn "Invalid version_flag type: ", ref($custom_flags);
 			return undef;
 		}
 	} else {
@@ -195,41 +193,24 @@ sub _capture_version_output {
 		push @flags, qw(/? -?) if $^O eq 'MSWin32';
 	}
 
-	# Return cached result if available
-	return $VERSION_CACHE{$path} if exists $VERSION_CACHE{$path};
-
 	for my $flag (@flags) {
-		my $out;
-		my $err;
-
-		eval {
-			local $SIG{ALRM} = sub { die 'timeout' };
-			alarm(2);  # 2 second timeout
-
-			run3([$path, $flag], \undef, \$out, \$err);
-
-			alarm(0);	# Cancel alarm
+		my $out = eval {
+			if ($flag eq '') {
+				# Call with no arguments
+				my $cmd = qq{"$path" 2>&1};
+				qx{$cmd};
+			} else {
+				# Call with the flag
+				my $cmd = qq{"$path" $flag 2>&1};
+				qx{$cmd};
+			}
 		};
-
-		if ($@) {
-			alarm(0);	# Ensure alarm is cancelled
-			next if $@ =~ /timeout/;
-			warn "Error running $path $flag: $@";
-			next;
-		}
-
-		my $output = defined $out ? $out : '';
-		$output .= defined $err ? $err : '';
-
-		next if $output eq '';
-
-		# Cache the result (even if undef)
-		$VERSION_CACHE{$path} = $output;
-		return $output;
+		next if($@);
+		next unless defined $out;
+		next if $out eq '';
+		return $out;
 	}
 
-	# Cache the result (even if undef)
-	$VERSION_CACHE{$path} = undef;
 	return undef;
 }
 
@@ -273,31 +254,40 @@ sub _extract_version {
 sub _version_satisfies {
 	my ($found, $op, $required) = @_;
 
+::diag(__LINE__);
 	return 0 unless defined $found;
-
-	# Parse both versions, checking each separately
+::diag(__LINE__);
+	
+	# parse with version.pm - use method call syntax
 	my $vf = eval { version->parse($found) };
 	if ($@) {
 		warn "Failed to parse found version '$found': $@";
 		return 0;
 	}
-
+	
 	my $vr = eval { version->parse($required) };
 	if ($@) {
 		warn "Failed to parse required version '$required': $@";
 		return 0;
 	}
 
-	# Now do comparisons
-	if    ($op eq '>=') { return $vf >= $vr }
-	elsif ($op eq '>')  { return $vf >  $vr }
-	elsif ($op eq '<=') { return $vf <= $vr }
-	elsif ($op eq '<')  { return $vf <  $vr }
-	elsif ($op eq '==') { return $vf == $vr }
-	elsif ($op eq '!=') { return $vf != $vr }
+	# Debug output
+	if ($ENV{TEST_VERBOSE}) {
+		warn "Comparing: $vf ($found) $op $vr ($required)\n";
+		warn "  vf numified: " . $vf->numify . "\n";
+		warn "  vr numified: " . $vr->numify . "\n";
+	}
 
-	warn "Unknown operator '$op'";
-	return 0;
+	# Return explicit 1 or 0, not comparison result directly
+	if ($op eq '>=') { return $vf >= $vr ? 1 : 0 }
+	if ($op eq '>')  { return $vf >  $vr ? 1 : 0 }
+	if ($op eq '<=') { return $vf <= $vr ? 1 : 0 }
+	if ($op eq '<')  { return $vf <  $vr ? 1 : 0 }
+	if ($op eq '==') { return $vf == $vr ? 1 : 0 }
+	if ($op eq '!=') { return $vf != $vr ? 1 : 0 }
+	
+	# fallback: equality
+	return $vf == $vr ? 1 : 0;
 }
 
 # Parse a constraint like ">=1.2.3" into (op, ver)
@@ -398,8 +388,11 @@ sub _check_requirements {
 			next;
 		}
 
-		# No version constraint - program exists, we're done
-		next unless defined $want;
+		# No version constraint - just check if it exists
+		if (!defined $want) {
+			push @checked, { name => $name, constraint => undef, version_flag => undef };
+			next;
+		}
 
 		# Extract custom version flags if provided
 		my $version_flag = undef;
