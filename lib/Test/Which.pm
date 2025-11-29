@@ -554,8 +554,7 @@ sub import {
 	if ($ENV{TEST_WHICH_VERBOSE} || $ENV{TEST_VERBOSE} || $ENV{HARNESS_IS_VERBOSE}) {
 		for my $r (@{ $res->{checked} }) {
 			my $name = $r->{name};
-			my $path = which($name);
-			my $out = _capture_version_output($path);
+			my $out = _capture_version_output(which($name), $r->{'version_flag'});
 			my $version = _extract_version($out);
 
 			if (defined $version) {
