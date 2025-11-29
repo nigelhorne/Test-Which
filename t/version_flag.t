@@ -145,7 +145,7 @@ subtest 'test array of version flags' => sub {
 	} 'array of version_flags does not die';
 
 	ok($result, 'array of flags works')
-		or diag("Array version_flag may not be implemented yet");
+		or diag('Array version_flag may not be implemented yet');
 };
 
 subtest 'test regex constraint' => sub {
@@ -161,7 +161,7 @@ subtest 'test regex constraint' => sub {
 	} 'regex constraint does not die';
 
 	ok($result, 'regex constraint works')
-		or diag("Regex constraint may not be implemented yet");
+		or diag('Regex constraint may not be implemented yet');
 };
 
 subtest 'test empty version flag' => sub {
