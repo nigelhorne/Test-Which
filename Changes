@@ -5,6 +5,7 @@ Revision history for Test-Which
 	Print version found if TEST_VERBOSE is set
 	Cache the result
 	Added support for extractor
+	Added version_flag
 
 0.03	Fri Nov 28 16:30:02 EST 2025
 	Use hashref rather than putting entire hash on the stack

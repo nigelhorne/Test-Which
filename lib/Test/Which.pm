@@ -67,13 +67,37 @@ If a version is requested but cannot be determined, the requirement fails.
 
   # Custom Version Extraction
   # Some programs have non-standard version output
-  which_ok 'myprogram', { 
+  which_ok 'myprogram', {
     version => '>=1.0',
-    extractor => sub { 
+    extractor => sub {
         my $output = shift;
         return $1 if $output =~ /Build (\d+\.\d+)/;
     }
+  };
+
+  # Java typically uses -version (single dash)
+  which_ok 'java', {
+    version => '>=11',
+    version_flag => '-version'
 };
+
+  # Some programs use /? on Windows
+  which_ok 'cmd', {
+      version => qr/\d+/,
+      version_flag => '/?'
+  } if $^O eq 'MSWin32';
+
+  # GCC uses --version but some aliases might need -version
+  which_ok 'gcc', {
+    version => '>=9.0',
+    version_flag => ['--version', '-version']
+  };
+
+  # Some tools print version to stdout without any flag
+  which_ok 'mytool', {
+    version => '>=1.0',
+    version_flag => ''  # Empty string means no flag
+  };
 
 =head1 FUNCTIONS
 
@@ -82,6 +106,32 @@ If a version is requested but cannot be determined, the requirement fails.
 Checks the named programs (with optional version constraints).
 If any requirement is not met,
 the current test or subtest is skipped via L<Test::Builder>.
+
+=head2 Custom Version Flags
+
+Some programs use non-standard flags to display version information.
+You can specify custom flags:
+
+  # Single custom flag
+  which_ok 'java', {
+      version => '>=11',
+      version_flag => '-version'
+  };
+
+  # Try multiple flags in order
+  which_ok 'myprogram', {
+      version => '>=2.0',
+      version_flag => ['--show-version', '-version']
+  };
+
+  # Program prints version without any flag
+  which_ok 'sometool', {
+      version => '>=1.0',
+      version_flag => ''
+  };
+
+If version_flag is not specified, the module tries these flags in order:
+--version, -version, -v, -V (and /?, -? on Windows)
 
 =cut
 
@@ -125,12 +175,31 @@ sub which_ok {
 
 # Helper: run a program with one of the version flags and capture output
 sub _capture_version_output {
-	my $path = $_[0];
+	my ($path, $custom_flags) = @_;
+
+	# Determine which flags to try
+	my @flags;
+	if (defined $custom_flags) {
+		# Custom flags provided
+		if (ref($custom_flags) eq 'ARRAY') {
+			@flags = @$custom_flags;
+		} elsif (!ref($custom_flags)) {
+			@flags = ($custom_flags);
+		} else {
+			warn "Invalid version_flag type: " . ref($custom_flags);
+			return undef;
+		}
+	} else {
+		# Default flags
+		@flags = qw(--version -version -v -V);
+		# Add Windows-specific flags on Windows
+		push @flags, qw(/? -?) if $^O eq 'MSWin32';
+	}
 
 	# Return cached result if available
 	return $VERSION_CACHE{$path} if exists $VERSION_CACHE{$path};
 
-	for my $flag (qw(--version -version -v -V)) {
+	for my $flag (@flags) {
 		my $out;
 		my $err;
 
@@ -320,20 +389,27 @@ sub _check_requirements {
 		# No version constraint - program exists, we're done
 		next unless defined $want;
 
+		# Extract custom version flags if provided
+		my $version_flag = undef;
+
 		# Handle hashref constraints
 		if (ref($want) eq 'HASH') {
-			# Currently only support { version => qr/.../ }
+			# Currently support { version => ... } and { version_flag => ... }
+
+			# Extract version_flag if present
+			$version_flag = $want->{version_flag} if exists $want->{version_flag};
+
 			if (exists $want->{version}) {
 				my $version_spec = $want->{version};
 				my $found;
 				if (exists $want->{extractor}) {
 					my $extractor = $want->{extractor};
 					if (ref($extractor) eq 'CODE') {
-						my $out = _capture_version_output($path);
+						my $out = _capture_version_output($path, $version_flag);
 						$found = $extractor->($out);
 					}
 				} else {
-					my $out = _capture_version_output($path);
+					my $out = _capture_version_output($path, $version_flag);
 					$found = _extract_version($out);
 				}
 

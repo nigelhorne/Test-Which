@@ -44,13 +44,37 @@ If a version is requested but cannot be determined, the requirement fails.
 
     # Custom Version Extraction
     # Some programs have non-standard version output
-    which_ok 'myprogram', { 
+    which_ok 'myprogram', {
       version => '>=1.0',
-      extractor => sub { 
+      extractor => sub {
           my $output = shift;
           return $1 if $output =~ /Build (\d+\.\d+)/;
       }
+    };
+
+    # Java typically uses -version (single dash)
+    which_ok 'java', { 
+      version => '>=11',
+      version_flag => '-version'
   };
+
+    # Some programs use /? on Windows
+    which_ok 'cmd', {
+        version => qr/\d+/,
+        version_flag => '/?'
+    } if $^O eq 'MSWin32';
+
+    # GCC uses --version but some aliases might need -version
+    which_ok 'gcc', {
+      version => '>=9.0',
+      version_flag => ['--version', '-version']
+    };
+
+    # Some tools print version to stdout without any flag
+    which_ok 'mytool', {
+      version => '>=1.0',
+      version_flag => ''  # Empty string means no flag
+    };
 
 # FUNCTIONS
 
@@ -59,6 +83,32 @@ If a version is requested but cannot be determined, the requirement fails.
 Checks the named programs (with optional version constraints).
 If any requirement is not met,
 the current test or subtest is skipped via [Test::Builder](https://metacpan.org/pod/Test%3A%3ABuilder).
+
+## Custom Version Flags
+
+Some programs use non-standard flags to display version information.
+You can specify custom flags:
+
+    # Single custom flag
+    which_ok 'java', { 
+        version => '>=11',
+        version_flag => '-version'
+    };
+    
+    # Try multiple flags in order
+    which_ok 'myprogram', { 
+        version => '>=2.0',
+        version_flag => ['--show-version', '-version']
+    };
+    
+    # Program prints version without any flag
+    which_ok 'sometool', {
+        version => '>=1.0',
+        version_flag => ''
+    };
+
+If version\_flag is not specified, the module tries these flags in order:
+\--version, -version, -v, -V (and /?, -? on Windows)
 
 # SUPPORT
 
