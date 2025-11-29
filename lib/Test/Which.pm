@@ -156,8 +156,7 @@ sub which_ok {
 	if ($ENV{TEST_WHICH_VERBOSE} || $ENV{TEST_VERBOSE} || $ENV{HARNESS_IS_VERBOSE}) {
 		for my $r (@{ $res->{checked} }) {
 			my $name = $r->{name};
-			my $path = which($name);
-			my $out = _capture_version_output($path);
+			my $out = _capture_version_output(which($name), $r->{'version_flag'});
 			my $version = _extract_version($out);
 
 			if (defined $version) {
@@ -411,6 +410,10 @@ sub _check_requirements {
 
 			# Extract version_flag if present
 			$version_flag = $want->{version_flag} if exists $want->{version_flag};
+
+			if($version_flag) {
+				$r->{version_flag} = $version_flag;
+			}
 
 			if (exists $want->{version}) {
 				my $version_spec = $want->{version};
