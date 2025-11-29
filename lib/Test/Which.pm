@@ -14,6 +14,7 @@ use Test::Builder;
 our @EXPORT_OK = qw(which_ok);
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
+my %VERSION_CACHE;
 my $TEST = Test::Builder->new();
 
 =head1 NAME
@@ -63,6 +64,16 @@ If a version is requested but cannot be determined, the requirement fails.
 
   # String in hashref (for consistency)
   which_ok 'perl', { version => '>=5.10' };
+
+  # Custom Version Extraction
+  # Some programs have non-standard version output
+  which_ok 'myprogram', { 
+    version => '>=1.0',
+    extractor => sub { 
+        my $output = shift;
+        return $1 if $output =~ /Build (\d+\.\d+)/;
+    }
+};
 
 =head1 FUNCTIONS
 
@@ -116,6 +127,9 @@ sub which_ok {
 sub _capture_version_output {
 	my $path = $_[0];
 
+	# Return cached result if available
+	return $VERSION_CACHE{$path} if exists $VERSION_CACHE{$path};
+
 	for my $flag (qw(--version -version -v -V)) {
 		my $out;
 		my $err;
@@ -140,8 +154,14 @@ sub _capture_version_output {
 		$output .= defined $err ? $err : '';
 
 		next if $output eq '';
+
+		# Cache the result (even if undef)
+		$VERSION_CACHE{$path} = $output;
 		return $output;
 	}
+
+	# Cache the result (even if undef)
+	$VERSION_CACHE{$path} = undef;
 	return undef;
 }
 
@@ -305,8 +325,17 @@ sub _check_requirements {
 			# Currently only support { version => qr/.../ }
 			if (exists $want->{version}) {
 				my $version_spec = $want->{version};
-				my $out = _capture_version_output($path);
-				my $found = _extract_version($out);
+				my $found;
+				if (exists $want->{extractor}) {
+					my $extractor = $want->{extractor};
+					if (ref($extractor) eq 'CODE') {
+						my $out = _capture_version_output($path);
+						$found = $extractor->($out);
+					}
+				} else {
+					my $out = _capture_version_output($path);
+					$found = _extract_version($out);
+				}
 
 				unless (defined $found) {
 					push @bad_version, {

@@ -42,12 +42,23 @@ If a version is requested but cannot be determined, the requirement fails.
     # String in hashref (for consistency)
     which_ok 'perl', { version => '>=5.10' };
 
+    # Custom Version Extraction
+    # Some programs have non-standard version output
+    which_ok 'myprogram', { 
+      version => '>=1.0',
+      extractor => sub { 
+          my $output = shift;
+          return $1 if $output =~ /Build (\d+\.\d+)/;
+      }
+  };
+
 # FUNCTIONS
 
 ## which\_ok @programs\_or\_pairs
 
 Checks the named programs (with optional version constraints).
-If any requirement is not met the current test or subtest is skipped via [Test::Builder](https://metacpan.org/pod/Test%3A%3ABuilder).
+If any requirement is not met,
+the current test or subtest is skipped via [Test::Builder](https://metacpan.org/pod/Test%3A%3ABuilder).
 
 # SUPPORT
 
