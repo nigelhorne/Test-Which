@@ -13,6 +13,7 @@ use Test::Builder;
 our @EXPORT_OK = qw(which_ok);
 our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
+my %VERSION_CACHE;
 my $TEST = Test::Builder->new();
 
 =head1 NAME
@@ -174,6 +175,19 @@ sub which_ok {
 sub _capture_version_output {
 	my ($path, $custom_flags) = @_;
 
+	# Create cache key from path and flags
+	my $cache_key = $path;
+	if (defined $custom_flags) {
+		if (ref($custom_flags) eq 'ARRAY') {
+			$cache_key .= '|' . join(',', @$custom_flags);
+		} elsif (!ref($custom_flags)) {
+			$cache_key .= '|' . $custom_flags;
+		}
+	}
+
+	# Return cached result if available
+	return $VERSION_CACHE{$cache_key} if exists $VERSION_CACHE{$cache_key};
+
 	# Determine which flags to try
 	my @flags;
 	if (defined $custom_flags) {
@@ -184,6 +198,7 @@ sub _capture_version_output {
 			@flags = ($custom_flags);
 		} else {
 			warn "Invalid version_flag type: ", ref($custom_flags);
+			$VERSION_CACHE{$cache_key} = undef;
 			return undef;
 		}
 	} else {
@@ -208,9 +223,13 @@ sub _capture_version_output {
 		next if($@);
 		next unless defined $out;
 		next if $out eq '';
+		# Cache and return the result
+		$VERSION_CACHE{$cache_key} = $out;
 		return $out;
 	}
 
+	# Cache the failure (undef) so we don't keep retrying
+	$VERSION_CACHE{$cache_key} = undef;
 	return undef;
 }
 
@@ -255,26 +274,26 @@ sub _version_satisfies {
 	my ($found, $op, $required) = @_;
 
 	return 0 unless defined $found;
-	
+
 	# Normalize version strings to have same number of components
 	my @found_parts = split /\./, $found;
 	my @req_parts = split /\./, $required;
-	
+
 	# Pad to same length
 	my $max_len = @found_parts > @req_parts ? @found_parts : @req_parts;
 	push @found_parts, (0) x ($max_len - @found_parts);
 	push @req_parts, (0) x ($max_len - @req_parts);
-	
+
 	my $found_normalized = join('.', @found_parts);
 	my $req_normalized = join('.', @req_parts);
-	
+
 	# Parse with version.pm
 	my $vf = eval { version->parse($found_normalized) };
 	if ($@) {
 		warn "Failed to parse found version '$found': $@";
 		return 0;
 	}
-	
+
 	my $vr = eval { version->parse($req_normalized) };
 	if ($@) {
 		warn "Failed to parse required version '$required': $@";
@@ -283,14 +302,14 @@ sub _version_satisfies {
 
 	# Return explicit 1 or 0
 	my $result;
-	if    ($op eq '>=') { $result = $vf >= $vr }
+	if ($op eq '>=') { $result = $vf >= $vr }
 	elsif ($op eq '>')  { $result = $vf >  $vr }
 	elsif ($op eq '<=') { $result = $vf <= $vr }
 	elsif ($op eq '<')  { $result = $vf <  $vr }
 	elsif ($op eq '==') { $result = $vf == $vr }
 	elsif ($op eq '!=') { $result = $vf != $vr }
 	else { $result = $vf == $vr }
-	
+
 	return $result ? 1 : 0;
 }
 
@@ -385,9 +404,9 @@ sub _check_requirements {
 
 		# Verify it's executable
 		unless (-x $path) {
-			push @bad_version, { 
-				name => $name, 
-				reason => "found at $path but not executable" 
+			push @bad_version, {
+				name => $name,
+				reason => "found at $path but not executable"
 			};
 			next;
 		}

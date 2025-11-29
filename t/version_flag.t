@@ -12,15 +12,15 @@ my $tempdir = tempdir(CLEANUP => 1);
 # Helper to create a mock executable
 sub create_mock_program {
 	my ($name, $script_content) = @_;
-	
+
 	my $path = File::Spec->catfile($tempdir, $name);
-	
+
 	open my $fh, '>', $path or die "Cannot create $path: $!";
 	print $fh $script_content;
 	close $fh;
-	
+
 	chmod 0755, $path or die "Cannot chmod $path: $!";
-	
+
 	return $path;
 }
 
@@ -39,20 +39,20 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	# Test basic string constraint
 	my $result = which_ok('basicprog' => '>=1.0');
 	ok($result, 'basic string constraint works') or diag("Result: $result");
-	
+
 	# Test if program can be found
 	my $path = which('basicprog');
 	ok($path, "basicprog found at: $path");
-	
+
 	# Manually test version detection
 	require Test::Which;
 	my $output = Test::Which::_capture_version_output($path);
 	ok(defined $output, "Got output: " . (defined $output ? $output : 'undef'));
-	
+
 	my $version = Test::Which::_extract_version($output);
 	is($version, '1.2.3', "Extracted version correctly: " . (defined $version ? $version : 'undef'));
 };
@@ -69,14 +69,14 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	# Test if hashref is accepted at all
 	my $result;
 	lives_ok {
 		$result = which_ok('hashprog', { version => '>=2.0' });
 	} 'hashref constraint does not die';
-	
-	ok($result, 'hashref with string version works') 
+
+	ok($result, 'hashref with string version works')
 		or diag("Hashref constraint failed - may not be implemented yet");
 };
 
@@ -92,22 +92,22 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	# First verify it fails with default flags
 	my $result1 = which_ok('customprog' => '>=3.0');
 	ok(!$result1, 'fails with default flags (as expected)');
-	
+
 	# Now test with custom flag in hashref
 	my $result2;
 	lives_ok {
-		$result2 = which_ok('customprog', { 
+		$result2 = which_ok('customprog', {
 			version => '>=3.0',
 			version_flag => '-H'
 		});
 	} 'custom version_flag does not die';
-	
+
 	ok($result2, 'succeeds with custom version_flag')
-		or diag("Custom version_flag may not be implemented yet");
+		or diag('Custom version_flag may not be implemented yet');
 };
 
 # Test 4: Verify _capture_version_output accepts second parameter
@@ -122,21 +122,21 @@ exit 1
 EOF
 
 	use_ok('Test::Which');
-	
+
 	my $path = which('flagprog');
 	ok($path, "flagprog found");
-	
+
 	# Test default behavior
 	my $output1 = Test::Which::_capture_version_output($path);
-	ok(!defined $output1 || $output1 eq '', 
+	ok(!defined $output1 || $output1 eq '',
 		'no output with default flags (as expected)');
-	
+
 	# Test with custom flag
 	my $output2;
 	lives_ok {
 		$output2 = Test::Which::_capture_version_output($path, '-show-ver');
 	} '_capture_version_output accepts second parameter';
-	
+
 	like($output2 || '', qr/1\.5\.0/, 'custom flag returns version')
 		or diag("Output with custom flag: " . ($output2 || 'undef'));
 };
@@ -153,15 +153,15 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	my $result;
 	lives_ok {
-		$result = which_ok('arrayprog', { 
+		$result = which_ok('arrayprog', {
 			version => '>=2.0',
 			version_flag => ['--version', '-ver']
 		});
 	} 'array of version_flags does not die';
-	
+
 	ok($result, 'array of flags works')
 		or diag("Array version_flag may not be implemented yet");
 };
@@ -178,14 +178,14 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	my $result;
 	lives_ok {
-		$result = which_ok('regexprog', { 
+		$result = which_ok('regexprog', {
 			version => qr/^5\.\d+/
 		});
 	} 'regex constraint does not die';
-	
+
 	ok($result, 'regex constraint works')
 		or diag("Regex constraint may not be implemented yet");
 };
@@ -202,25 +202,25 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
+
 	my $result;
 	lives_ok {
-		$result = which_ok('noflagprog', { 
+		$result = which_ok('noflagprog', {
 			version => '>=1.0',
 			version_flag => ''
 		});
 	} 'empty version_flag does not die';
-	
+
 	ok($result, 'empty string flag works')
-		or diag("Empty version_flag may not be implemented yet");
+		or diag('Empty version_flag may not be implemented yet');
 };
 
 # Test 8: Show what needs to be implemented
 subtest 'summary of implementation status' => sub {
-	note("This test summarizes what features are working");
-	
+	note('This test summarizes what features are working');
+
 	# You can add manual checks here based on earlier test results
-	pass("Check earlier subtests for implementation status");
+	pass('Check earlier subtests for implementation status');
 };
 
 done_testing();

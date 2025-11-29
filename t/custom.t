@@ -20,7 +20,7 @@ sub create_mock_program {
 }
 
 subtest 'edge cases and error conditions' => sub {
-	
+
 	# Program that outputs to STDERR only
 	my $prog1 = create_mock_program('stderrprog', <<'EOF');
 #!/bin/sh
@@ -32,22 +32,21 @@ exit 1
 EOF
 
 	use_ok('Test::Which', 'which_ok');
-	
-	ok(which_ok('stderrprog' => '>=1.0'), 
-		'captures version from STDERR');
-	
+
+	ok(which_ok('stderrprog' => '>=1.0'), 'captures version from STDERR');
+
 	# Program that exits with no output
 	my $prog2 = create_mock_program('silentprog', <<'EOF');
 #!/bin/sh
 exit 0
 EOF
 
-	my $result = which_ok('silentprog', { 
+	my $result = which_ok('silentprog', {
 		version => '>=1.0',
 		version_flag => '--version'
 	});
 	ok(!$result, 'handles programs with no output');
-	
+
 	# Program with year-based version format
 	my $prog3 = create_mock_program('weirdver', <<'EOF');
 #!/bin/sh
@@ -62,7 +61,7 @@ EOF
 		version => '>=2020.10',
 		version_flag => '-version'
 	}), 'handles year-based version formats');
-	
+
 	# Test with regex
 	ok(which_ok('weirdver', {
 		version => qr/^2020\./,
