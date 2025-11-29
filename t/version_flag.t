@@ -11,17 +11,34 @@ my $tempdir = tempdir(CLEANUP => 1);
 
 # Helper to create a mock executable
 sub create_mock_program {
-	my ($name, $script_content) = @_;
-
-	my $path = File::Spec->catfile($tempdir, $name);
-
-	open my $fh, '>', $path or die "Cannot create $path: $!";
-	print $fh $script_content;
-	close $fh;
-
-	chmod 0755, $path or die "Cannot chmod $path: $!";
-
-	return $path;
+    my ($name, $script_content) = @_;
+    
+    my $path;
+    if ($^O eq 'MSWin32') {
+        # Create .bat file on Windows
+        $path = File::Spec->catfile($tempdir, "$name.bat");
+        open my $fh, '>', $path or die "Cannot create $path: $!";
+        
+        # Convert shell script to batch script
+        my $batch_content = '@echo off' . "\n";
+        
+        # Simple conversion for basic cases
+        if ($script_content =~ /echo "([^"]+)"/) {
+            $batch_content .= "echo $1\n";
+        }
+        
+        print $fh $batch_content;
+        close $fh;
+    } else {
+        # Unix shell script
+        $path = File::Spec->catfile($tempdir, $name);
+        open my $fh, '>', $path or die "Cannot create $path: $!";
+        print $fh $script_content;
+        close $fh;
+        chmod 0755, $path or die "Cannot chmod $path: $!";
+    }
+    
+    return $path;
 }
 
 # Add tempdir to PATH so which() can find our mock programs
