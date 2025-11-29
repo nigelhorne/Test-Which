@@ -19,21 +19,21 @@ $ENV{PATH} = "$tempdir:$ENV{PATH}";
 # Helper to create a mock executable
 sub create_mock_program {
 	my ($name, $script_content) = @_;
-	
+
 	my $path;
 	if ($^O eq 'MSWin32') {
 		# Create .bat file on Windows
 		$path = File::Spec->catfile($tempdir, "$name.bat");
 		open my $fh, '>', $path or die "Cannot create $path: $!";
-		
+
 		# Convert shell script to batch script
 		my $batch_content = '@echo off' . "\n";
-		
+
 		# Simple conversion for basic cases
 		if ($script_content =~ /echo "([^"]+)"/) {
 			$batch_content .= "echo $1\n";
 		}
-		
+
 		print $fh $batch_content;
 		close $fh;
 	} else {
@@ -44,7 +44,7 @@ sub create_mock_program {
 		close $fh;
 		chmod 0755, $path or die "Cannot chmod $path: $!";
 	}
-	
+
 	return $path;
 }
 

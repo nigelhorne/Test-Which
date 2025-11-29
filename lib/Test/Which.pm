@@ -43,75 +43,72 @@ our $VERSION = '0.03';
 =head1 DESCRIPTION
 
 C<Test::Which> mirrors L<Test::Needs> but checks for executables in PATH.
-It can also check simple version constraints using a built-in heuristic (tries --version, -version, -v, -V and extracts a dotted-number).
+It can also check version constraints using a built-in heuristic that tries
+common version flags (--version, -version, -v, -V) and extracts version numbers
+from the output.
+
 If a version is requested but cannot be determined, the requirement fails.
 
-=head2 EXAMPLES
+Key features:
 
-  # String constraints
-  which_ok 'perl' => '>=5.10';
-  which_ok 'ffmpeg' => '>=4.0', 'convert' => '7.1';
+=over 4
 
-  # Regex constraints
-  which_ok 'perl', { version => qr/5\.\d+/ };
+=item * Compile-time and runtime checking of program availability
 
-  # Mixed
-  which_ok 'perl' => '>=5.10', 'ffmpeg', { version => qr/^[4-6]\./ };
+=item * Version comparison with standard operators (>=, >, <, <=, ==, !=)
 
-  # Just program names
+=item * Regular expression matching for version strings
+
+=item * Custom version flag support for non-standard programs
+
+=item * Custom version extraction for unusual output formats
+
+=item * Caching to avoid repeated program execution
+
+=item * Cross-platform support (Unix, Linux, macOS, Windows)
+
+=back
+
+=head1 EXAMPLES
+
+=head2 Basic Usage
+
+Check for program availability without version constraints:
+
+  use Test::Which qw(which_ok);
+
   which_ok 'perl', 'ffmpeg', 'convert';
 
-  # String in hashref (for consistency)
+=head2 Version Constraints
+
+Check programs with minimum version requirements:
+
+  # String constraints with comparison operators
+  which_ok 'perl' => '>=5.10';
+  which_ok 'ffmpeg' => '>=4.0', 'convert' => '>=7.1';
+
+  # Exact version match
+  which_ok 'node' => '==18.0.0';
+
+  # Version range
+  which_ok 'python' => '>=3.8', 'python' => '<4.0';
+
+=head2 Hashref Syntax
+
+Use hashrefs for more complex constraints:
+
+  # String version in hashref
   which_ok 'perl', { version => '>=5.10' };
 
-  # Custom Version Extraction
-  # Some programs have non-standard version output
-  which_ok 'myprogram', {
-    version => '>=1.0',
-    extractor => sub {
-        my $output = shift;
-        return $1 if $output =~ /Build (\d+\.\d+)/;
-    }
-  };
-
-  # Java typically uses -version (single dash)
-  which_ok 'java', {
-    version => '>=11',
-    version_flag => '-version'
-};
-
-  # Some programs use /? on Windows
-  which_ok 'cmd', {
-      version => qr/\d+/,
-      version_flag => '/?'
-  } if $^O eq 'MSWin32';
-
-  # GCC uses --version but some aliases might need -version
-  which_ok 'gcc', {
-    version => '>=9.0',
-    version_flag => ['--version', '-version']
-  };
-
-  # Some tools print version to stdout without any flag
-  which_ok 'mytool', {
-    version => '>=1.0',
-    version_flag => ''  # Empty string means no flag
-  };
-
-=head1 FUNCTIONS
-
-=head2 which_ok @programs_or_pairs
-
-Checks the named programs (with optional version constraints).
-If any requirement is not met,
-the current test or subtest is skipped via L<Test::Builder>.
+  # Regex matching
+  which_ok 'perl', { version => qr/5\.\d+/ };
+  which_ok 'ffmpeg', { version => qr/^[4-6]\./ };
 
 =head2 Custom Version Flags
 
-Some programs use non-standard flags to display version information.
-You can specify custom flags:
+Some programs use non-standard flags to display version information:
 
-  # Single custom flag
+  # Java uses -version (single dash)
   which_ok 'java', {
       version => '>=11',
       version_flag => '-version'
@@ -120,7 +117,7 @@ You can specify custom flags:
   # Try multiple flags in order
   which_ok 'myprogram', {
       version => '>=2.0',
-      version_flag => ['--show-version', '-version']
+      version_flag => ['--show-version', '-version', '--ver']
   };
 
   # Program prints version without any flag
@@ -129,8 +126,194 @@ You can specify custom flags:
       version_flag => ''
   };
 
-If version_flag is not specified, the module tries these flags in order:
---version, -version, -v, -V (and /?, -? on Windows)
+  # Windows-specific flag
+  which_ok 'cmd', {
+      version => qr/\d+/,
+      version_flag => '/?'
+  } if $^O eq 'MSWin32';
+
+If C<version_flag> is not specified, the module tries these flags in order:
+C<--version>, C<-version>, C<-v>, C<-V> (and C</?>, C<-?> on Windows)
+
+=head2 Custom Version Extraction
+
+For programs with unusual version output formats:
+
+  which_ok 'myprogram', {
+      version => '>=1.0',
+      extractor => sub {
+          my $output = shift;
+          return $1 if $output =~ /Build (\d+\.\d+)/;
+          return undef;
+      }
+  };
+
+The extractor receives the program's output and should return the version
+string or undef if no version could be found.
+
+=head2 Mixed Usage
+
+Combine different constraint types:
+
+  which_ok
+      'perl' => '>=5.10',           # String constraint
+      'ffmpeg',                      # No constraint
+      'convert', { version => qr/^7\./ };  # Regex constraint
+
+=head2 Compile-Time Checking
+
+Skip entire test files if requirements aren't met:
+
+  use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
+
+  # Test file is skipped if either program is missing or version too old
+  # No tests below this line will run if requirements aren't met
+
+=head2 Runtime Checking in Subtests
+
+Check requirements for individual subtests:
+
+  use Test::Which qw(which_ok);
+
+  subtest 'video conversion' => sub {
+      which_ok 'ffmpeg' => '>=4.0' or return;
+      # ... tests using ffmpeg
+  };
+
+  subtest 'image processing' => sub {
+      which_ok 'convert' => '>=7.0' or return;
+      # ... tests using ImageMagick
+  };
+
+=head2 Absolute Paths
+
+You can specify absolute paths instead of searching PATH:
+
+  which_ok '/usr/local/bin/myprogram' => '>=1.0';
+
+The program must be executable.
+
+=head1 VERSION DETECTION
+
+The module attempts to detect version numbers using these strategies in order:
+
+=over 4
+
+=item 1. Look for version near the word "version" (case-insensitive)
+
+Matches patterns like: C<ffmpeg version 4.2.7>, C<Version: 2.1.0>
+
+=item 2. Extract dotted version from first line of output
+
+Common for programs that print version info prominently
+
+=item 3. Find any dotted version number in output
+
+Fallback for less standard formats
+
+=item 4. Look for single number near "version"
+
+For programs that use simple integer versioning
+
+=item 5. Use any standalone number found
+
+Last resort - least reliable
+
+=back
+
+=head1 VERSION COMPARISON
+
+Version comparison uses Perl's L<version> module. Versions are normalized
+to have the same number of components before comparison to avoid
+C<version.pm>'s parsing quirks.
+
+For example:
+  - C<2020.10> becomes C<2020.10.0>
+  - C<2020.10.15> stays C<2020.10.15>
+  - Then they're compared correctly
+
+Supported operators: C<< >= >>, C<< > >>, C<< <= >>, C<< < >>, C<=>, C<!=>
+
+=head1 CACHING
+
+Version detection results are cached to avoid repeated program execution.
+Each unique combination of program path and version flags creates a separate
+cache entry.
+
+Cache benefits:
+- Faster repeated checks in test suites
+- Reduced system load
+- Works across multiple test files in the same process
+
+The cache persists for the lifetime of the Perl process.
+
+=head1 VERBOSE OUTPUT
+
+Set environment variables to see detected versions:
+
+  TEST_WHICH_VERBOSE=1 prove -v t/mytest.t
+  TEST_VERBOSE=1 perl t/mytest.t
+  prove -v t/mytest.t  # HARNESS_IS_VERBOSE is set automatically
+
+Output includes the detected version for each checked program:
+
+  # perl: version 5.38.0
+  # ffmpeg: version 6.1.1
+
+=head1 PLATFORM SUPPORT
+
+=over 4
+
+=item * B<Unix/Linux/macOS>: Full support for all features
+
+=item * B<Windows>: Basic functionality supported. Complex shell features
+(STDERR redirection, empty flags) may have limitations.
+
+=back
+
+=head1 DIAGNOSTICS
+
+Common error messages:
+
+=over 4
+
+=item C<Missing required program 'foo'>
+
+The program 'foo' could not be found in PATH.
+
+=item C<Version issue for foo: no version detected>
+
+The program exists but the module couldn't extract a version number from
+its output. Try specifying a custom C<version_flag> or C<extractor>.
+
+=item C<Version issue for foo: found 1.0 but need >=2.0>
+
+The program's version doesn't meet the constraint.
+
+=item C<Version issue for foo: found version 1.0 but doesn't match pattern>
+
+For regex constraints, the detected version didn't match the pattern.
+
+=item C<hashref constraint must contain 'version' key>
+
+When using hashref syntax, you must include a C<version> key.
+
+=item C<invalid constraint 'foo'>
+
+The version constraint string couldn't be parsed. Use formats like
+C<'>=1.2.3'>, C<'>2.0'>, or C<'1.5'>.
+
+=back
+
+=head1 FUNCTIONS/METHODS
+
+=head2 which_ok @programs_or_pairs
+
+Checks the named programs (with optional version constraints).
+If any requirement is not met, the current test or subtest is skipped
+via L<Test::Builder>.
+
+Returns true if all requirements are met, false otherwise.
 
 =cut
 
@@ -187,7 +370,7 @@ sub _capture_version_output {
 			$cache_key .= '|' . $custom_flags;
 		}
 	}
-	
+
 	# Return cached result if available
 	return $VERSION_CACHE{$cache_key} if exists $VERSION_CACHE{$cache_key};
 
@@ -232,19 +415,19 @@ sub _capture_version_output {
 					$cmd = qq{'$escaped' $flag 2>&1};
 				}
 			}
-			
+
 			my $output = qx{$cmd};
 			return $output;
 		};
-		
+
 		next unless defined $out;
 		next if $out eq '';
-		
+
 		# Cache and return the result
 		$VERSION_CACHE{$cache_key} = $out;
 		return $out;
 	}
-	
+
 	# Cache the failure (undef) so we don't keep retrying
 	$VERSION_CACHE{$cache_key} = undef;
 	return undef;
@@ -606,6 +789,32 @@ __END__
 =head1 SUPPORT
 
 This module is provided as-is without any warranty.
+
+=head1 SEE ALSO
+
+L<Test::Needs> - Similar module for checking Perl module availability
+
+L<File::Which> - Used internally to locate programs
+
+L<version> - Used for version comparison
+
+L<Test::Builder> - Used for test integration
+
+=head1 LIMITATIONS
+
+=over 4
+
+=item * Version detection is heuristic-based and may fail for programs with
+unusual output formats. Use custom C<version_flag> or C<extractor> for such cases.
+
+=item * No built-in timeout for program execution. Hanging programs will hang tests.
+
+=item * Cache persists for process lifetime - updated programs won't be re-detected
+without restarting the test process.
+
+=item * Requires programs to be in PATH or specified with absolute paths.
+
+=back
 
 =head1 AUTHOR
 
