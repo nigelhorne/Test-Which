@@ -6,39 +6,46 @@ use File::Temp qw(tempdir);
 use File::Spec;
 use File::Which qw(which);
 
+BEGIN {
+	# FIXME
+	if ($^O eq 'MSWin32') {
+		plan skip_all => 'Shell script mock programs not compatible with Windows';
+	}
+}
+
 # Create a temporary directory for our mock programs
 my $tempdir = tempdir(CLEANUP => 1);
 
 # Helper to create a mock executable
 sub create_mock_program {
-    my ($name, $script_content) = @_;
-    
-    my $path;
-    if ($^O eq 'MSWin32') {
-        # Create .bat file on Windows
-        $path = File::Spec->catfile($tempdir, "$name.bat");
-        open my $fh, '>', $path or die "Cannot create $path: $!";
-        
-        # Convert shell script to batch script
-        my $batch_content = '@echo off' . "\n";
-        
-        # Simple conversion for basic cases
-        if ($script_content =~ /echo "([^"]+)"/) {
-            $batch_content .= "echo $1\n";
-        }
-        
-        print $fh $batch_content;
-        close $fh;
-    } else {
-        # Unix shell script
-        $path = File::Spec->catfile($tempdir, $name);
-        open my $fh, '>', $path or die "Cannot create $path: $!";
-        print $fh $script_content;
-        close $fh;
-        chmod 0755, $path or die "Cannot chmod $path: $!";
-    }
-    
-    return $path;
+	my ($name, $script_content) = @_;
+	
+	my $path;
+	if ($^O eq 'MSWin32') {
+		# Create .bat file on Windows
+		$path = File::Spec->catfile($tempdir, "$name.bat");
+		open my $fh, '>', $path or die "Cannot create $path: $!";
+		
+		# Convert shell script to batch script
+		my $batch_content = '@echo off' . "\n";
+		
+		# Simple conversion for basic cases
+		if ($script_content =~ /echo "([^"]+)"/) {
+			$batch_content .= "echo $1\n";
+		}
+		
+		print $fh $batch_content;
+		close $fh;
+	} else {
+		# Unix shell script
+		$path = File::Spec->catfile($tempdir, $name);
+		open my $fh, '>', $path or die "Cannot create $path: $!";
+		print $fh $script_content;
+		close $fh;
+		chmod 0755, $path or die "Cannot chmod $path: $!";
+	}
+	
+	return $path;
 }
 
 # Add tempdir to PATH so which() can find our mock programs
@@ -68,7 +75,7 @@ EOF
 	# Manually test version detection
 	require Test::Which;
 	my $output = Test::Which::_capture_version_output($path);
-	ok(defined $output, "Got output: " . (defined $output ? $output : 'undef'));
+	ok(defined $output, 'Got output: ' . (defined $output ? $output : 'undef'));
 
 	my $version = Test::Which::_extract_version($output);
 	is($version, '1.2.3', "Extracted version correctly: " . (defined $version ? $version : 'undef'));

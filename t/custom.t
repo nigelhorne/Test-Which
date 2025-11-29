@@ -6,16 +6,45 @@ use File::Temp qw(tempdir);
 use File::Spec;
 use File::Which qw(which);
 
+BEGIN {
+	# FIXME
+	if ($^O eq 'MSWin32') {
+		plan skip_all => 'Shell script mock programs not compatible with Windows';
+	}
+}
+
 my $tempdir = tempdir(CLEANUP => 1);
 $ENV{PATH} = "$tempdir:$ENV{PATH}";
 
+# Helper to create a mock executable
 sub create_mock_program {
 	my ($name, $script_content) = @_;
-	my $path = File::Spec->catfile($tempdir, $name);
-	open my $fh, '>', $path or die "Cannot create $path: $!";
-	print $fh $script_content;
-	close $fh;
-	chmod 0755, $path or die "Cannot chmod $path: $!";
+	
+	my $path;
+	if ($^O eq 'MSWin32') {
+		# Create .bat file on Windows
+		$path = File::Spec->catfile($tempdir, "$name.bat");
+		open my $fh, '>', $path or die "Cannot create $path: $!";
+		
+		# Convert shell script to batch script
+		my $batch_content = '@echo off' . "\n";
+		
+		# Simple conversion for basic cases
+		if ($script_content =~ /echo "([^"]+)"/) {
+			$batch_content .= "echo $1\n";
+		}
+		
+		print $fh $batch_content;
+		close $fh;
+	} else {
+		# Unix shell script
+		$path = File::Spec->catfile($tempdir, $name);
+		open my $fh, '>', $path or die "Cannot create $path: $!";
+		print $fh $script_content;
+		close $fh;
+		chmod 0755, $path or die "Cannot chmod $path: $!";
+	}
+	
 	return $path;
 }
 
