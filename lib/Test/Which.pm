@@ -254,40 +254,44 @@ sub _extract_version {
 sub _version_satisfies {
 	my ($found, $op, $required) = @_;
 
-::diag(__LINE__);
 	return 0 unless defined $found;
-::diag(__LINE__);
 	
-	# parse with version.pm - use method call syntax
-	my $vf = eval { version->parse($found) };
+	# Normalize version strings to have same number of components
+	my @found_parts = split /\./, $found;
+	my @req_parts = split /\./, $required;
+	
+	# Pad to same length
+	my $max_len = @found_parts > @req_parts ? @found_parts : @req_parts;
+	push @found_parts, (0) x ($max_len - @found_parts);
+	push @req_parts, (0) x ($max_len - @req_parts);
+	
+	my $found_normalized = join('.', @found_parts);
+	my $req_normalized = join('.', @req_parts);
+	
+	# Parse with version.pm
+	my $vf = eval { version->parse($found_normalized) };
 	if ($@) {
 		warn "Failed to parse found version '$found': $@";
 		return 0;
 	}
 	
-	my $vr = eval { version->parse($required) };
+	my $vr = eval { version->parse($req_normalized) };
 	if ($@) {
 		warn "Failed to parse required version '$required': $@";
 		return 0;
 	}
 
-	# Debug output
-	if ($ENV{TEST_VERBOSE}) {
-		warn "Comparing: $vf ($found) $op $vr ($required)\n";
-		warn "  vf numified: " . $vf->numify . "\n";
-		warn "  vr numified: " . $vr->numify . "\n";
-	}
-
-	# Return explicit 1 or 0, not comparison result directly
-	if ($op eq '>=') { return $vf >= $vr ? 1 : 0 }
-	if ($op eq '>')  { return $vf >  $vr ? 1 : 0 }
-	if ($op eq '<=') { return $vf <= $vr ? 1 : 0 }
-	if ($op eq '<')  { return $vf <  $vr ? 1 : 0 }
-	if ($op eq '==') { return $vf == $vr ? 1 : 0 }
-	if ($op eq '!=') { return $vf != $vr ? 1 : 0 }
+	# Return explicit 1 or 0
+	my $result;
+	if    ($op eq '>=') { $result = $vf >= $vr }
+	elsif ($op eq '>')  { $result = $vf >  $vr }
+	elsif ($op eq '<=') { $result = $vf <= $vr }
+	elsif ($op eq '<')  { $result = $vf <  $vr }
+	elsif ($op eq '==') { $result = $vf == $vr }
+	elsif ($op eq '!=') { $result = $vf != $vr }
+	else { $result = $vf == $vr }
 	
-	# fallback: equality
-	return $vf == $vr ? 1 : 0;
+	return $result ? 1 : 0;
 }
 
 # Parse a constraint like ">=1.2.3" into (op, ver)
