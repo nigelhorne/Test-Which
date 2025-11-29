@@ -175,6 +175,9 @@ sub which_ok {
 sub _capture_version_output {
 	my ($path, $custom_flags) = @_;
 
+	# Return undef immediately if path is not defined
+	return undef unless defined $path;
+
 	# Create cache key from path and flags
 	my $cache_key = $path;
 	if (defined $custom_flags) {
@@ -184,50 +187,64 @@ sub _capture_version_output {
 			$cache_key .= '|' . $custom_flags;
 		}
 	}
-
+	
 	# Return cached result if available
 	return $VERSION_CACHE{$cache_key} if exists $VERSION_CACHE{$cache_key};
 
 	# Determine which flags to try
 	my @flags;
 	if (defined $custom_flags) {
-		# Custom flags provided
 		if (ref($custom_flags) eq 'ARRAY') {
 			@flags = @$custom_flags;
 		} elsif (!ref($custom_flags)) {
 			@flags = ($custom_flags);
 		} else {
-			warn "Invalid version_flag type: ", ref($custom_flags);
+			warn 'Invalid version_flag type: ', ref($custom_flags);
 			$VERSION_CACHE{$cache_key} = undef;
 			return undef;
 		}
 	} else {
-		# Default flags
 		@flags = qw(--version -version -v -V);
-		# Add Windows-specific flags on Windows
+		# Add Windows-specific flags
 		push @flags, qw(/? -?) if $^O eq 'MSWin32';
 	}
 
 	for my $flag (@flags) {
 		my $out = eval {
+			# Platform-specific command construction
+			my $cmd;
 			if ($flag eq '') {
-				# Call with no arguments
-				my $cmd = qq{"$path" 2>&1};
-				qx{$cmd};
+				if ($^O eq 'MSWin32') {
+					$cmd = qq{"$path" 2>&1};
+				} else {
+					# Escape the path for shell on Unix
+					my $escaped = $path;
+					$escaped =~ s/'/'\\''/g;
+					$cmd = qq{'$escaped' 2>&1};
+				}
 			} else {
-				# Call with the flag
-				my $cmd = qq{"$path" $flag 2>&1};
-				qx{$cmd};
+				if ($^O eq 'MSWin32') {
+					$cmd = qq{"$path" $flag 2>&1};
+				} else {
+					# Escape the path for shell on Unix
+					my $escaped = $path;
+					$escaped =~ s/'/'\\''/g;
+					$cmd = qq{'$escaped' $flag 2>&1};
+				}
 			}
+			
+			my $output = qx{$cmd};
+			return $output;
 		};
-		next if($@);
+		
 		next unless defined $out;
 		next if $out eq '';
+		
 		# Cache and return the result
 		$VERSION_CACHE{$cache_key} = $out;
 		return $out;
 	}
-
+	
 	# Cache the failure (undef) so we don't keep retrying
 	$VERSION_CACHE{$cache_key} = undef;
 	return undef;
