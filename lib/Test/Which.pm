@@ -380,9 +380,22 @@ sub _check_requirements {
 		my $name = $r->{name};
 		my $want = $r->{constraint};
 
-		my $path = which($name);
-		unless ($path) {
-			push @missing, $name;
+		my $path = $name;
+		if ($name !~ m{^/} && $name !~ m{^[A-Za-z]:[\\/]}) {
+			# Not an absolute path, search in PATH
+			$path = which($name);
+			unless ($path) {
+				push @missing, $name;
+				next;
+			}
+		}
+
+		# Verify it's executable
+		unless (-x $path) {
+			push @bad_version, { 
+				name => $name, 
+				reason => "found at $path but not executable" 
+			};
 			next;
 		}
 
