@@ -91,6 +91,22 @@ sub which_ok {
 		return 0;
 	}
 
+	# Print versions if TEST_VERBOSE is set
+	if ($ENV{TEST_WHICH_VERBOSE} || $ENV{TEST_VERBOSE} || $ENV{HARNESS_IS_VERBOSE}) {
+		for my $r (@{ $res->{checked} }) {
+			my $name = $r->{name};
+			my $path = which($name);
+			my $out = _capture_version_output($path);
+			my $version = _extract_version($out);
+
+			if (defined $version) {
+				$TEST->diag("$name: version $version");
+			} else {
+				$TEST->diag("$name: found but version unknown");
+			}
+		}
+	}
+
 	# Actually run a passing test
 	$TEST->ok(1, 'Required programs available: ' . join(', ', map { $_->{name} } @{ $res->{checked} || [] }));
 	return 1;
@@ -411,6 +427,22 @@ sub import {
 		push @msgs, map { "Version issue for $_->{name}: $_->{reason}" } @bad;
 		my $msg = join('; ', @msgs);
 		$TEST->plan(skip_all => "Test::Which requirements not met: $msg");
+	}
+
+	# Print versions if TEST_VERBOSE is set
+	if ($ENV{TEST_WHICH_VERBOSE} || $ENV{TEST_VERBOSE} || $ENV{HARNESS_IS_VERBOSE}) {
+		for my $r (@{ $res->{checked} }) {
+			my $name = $r->{name};
+			my $path = which($name);
+			my $out = _capture_version_output($path);
+			my $version = _extract_version($out);
+
+			if (defined $version) {
+				print STDERR "# $name: version $version\n";
+			} else {
+				print STDERR "# $name: found but version unknown\n";
+			}
+		}
 	}
 }
 
