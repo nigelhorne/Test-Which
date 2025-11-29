@@ -69,7 +69,8 @@ If a version is requested but cannot be determined, the requirement fails.
 =head2 which_ok @programs_or_pairs
 
 Checks the named programs (with optional version constraints).
-If any requirement is not met the current test or subtest is skipped via L<Test::Builder>.
+If any requirement is not met,
+the current test or subtest is skipped via L<Test::Builder>.
 
 =cut
 
@@ -201,7 +202,7 @@ sub _parse_constraint {
 
 	return unless defined $spec;
 
-	if ($spec =~ /^\s*(>=|<=|==|!=|>|<)\s*(\S+)\s*$/) {
+	if ($spec =~ /^\s*(>=|<=|==|!=|>|<)\s*([0-9][\w\.\-]*)\s*$/) {
 		return ($1, $2);
 	}
 	# allow bare version (implies ==)
@@ -268,6 +269,7 @@ sub _check_requirements {
 
 	my @missing;
 	my @bad_version;
+	my @checked;
 
 	for my $r (@reqs) {
 		my $name = $r->{name};
@@ -290,98 +292,102 @@ sub _check_requirements {
 				my $out = _capture_version_output($path);
 				my $found = _extract_version($out);
 
-			unless (defined $found) {
-				push @bad_version, {
-					name => $name,
-					reason => 'no version detected for hashref constraint'
-				};
-				next;
-			}
+				unless (defined $found) {
+					push @bad_version, {
+						name => $name,
+						reason => 'no version detected for hashref constraint'
+					};
+					next;
+				}
 
-			# Regex constraint
-			if (ref($version_spec) eq 'Regexp') {
-				unless ($found =~ $version_spec) {
+				# Regex constraint
+				if (ref($version_spec) eq 'Regexp') {
+					unless ($found =~ $version_spec) {
+						push @bad_version, {
+							name => $name,
+							reason => "found version $found but doesn't match pattern $version_spec"
+						};
+						next;
+					}
+				} elsif (!ref($version_spec)) {
+					# String constraint within hashref (treat like normal string constraint)
+					my ($op, $ver) = _parse_constraint($version_spec);
+					unless (defined $op) {
+						push @bad_version, {
+							name => $name,
+							reason => "invalid constraint in hashref '$version_spec' (expected format: '>=1.2.3', '>2.0', '==1.5', or '1.5')"
+						};
+						next;
+					}
+					unless (_version_satisfies($found, $op, $ver)) {
+						push @bad_version, {
+							name => $name,
+							reason => "found $found but need $op$ver"
+						};
+						next;
+					}
+				} else {
+					# Unsupported type in hashref
 					push @bad_version, {
 						name => $name,
-						reason => "found version $found but doesn't match pattern $version_spec"
-					};
-					next;
-				}
-			} elsif (!ref($version_spec)) {
-				# String constraint within hashref (treat like normal string constraint)
-				my ($op, $ver) = _parse_constraint($version_spec);
-				unless (defined $op) {
-					push @bad_version, {
-						name => $name,
-						reason => "invalid constraint in hashref '$version_spec' (expected format: '>=1.2.3', '>2.0', '==1.5', or '1.5')"
-					};
-					next;
-				}
-				unless (_version_satisfies($found, $op, $ver)) {
-					push @bad_version, {
-						name => $name,
-						reason => "found $found but need $op$ver"
+						reason => "unsupported version spec type in hashref: " . ref($version_spec)
 					};
 					next;
 				}
 			} else {
-				# Unsupported type in hashref
+				# Hashref without 'version' key
 				push @bad_version, {
 					name => $name,
-					reason => "unsupported version spec type in hashref: " . ref($version_spec)
+					reason => "hashref constraint must contain 'version' key"
+				};
+				next;
+			}
+		} elsif (!ref($want)) {
+			# Handle string constraints
+			my ($op, $ver) = _parse_constraint($want);
+			unless (defined $op) {
+				push @bad_version, {
+					name => $name,
+					reason => "invalid constraint '$want' (expected format: '>=1.2.3', '>2.0', '==1.5', or '1.5')"
+				};
+				next;
+			}
+
+			my $out = _capture_version_output($path);
+			my $found = _extract_version($out);
+
+			unless (defined $found) {
+				push @bad_version, {
+					name => $name,
+					reason => 'no version detected'
+					};
+				next;
+			}
+
+			unless (_version_satisfies($found, $op, $ver)) {
+				push @bad_version, {
+					name => $name,
+					reason => "found $found but need $op$ver"
 				};
 				next;
 			}
 		} else {
-			# Hashref without 'version' key
+			# Unsupported constraint type
 			push @bad_version, {
 				name => $name,
-				reason => "hashref constraint must contain 'version' key"
-			};
-			next;
-		}
-	} elsif (!ref($want)) {
-		# Handle string constraints
-		my ($op, $ver) = _parse_constraint($want);
-		unless (defined $op) {
-			push @bad_version, {
-				name => $name,
-				reason => "invalid constraint '$want' (expected format: '>=1.2.3', '>2.0', '==1.5', or '1.5')"
+				reason => "unsupported constraint type: " . ref($want)
 			};
 			next;
 		}
 
-		my $out = _capture_version_output($path);
-		my $found = _extract_version($out);
-
-		unless (defined $found) {
-			push @bad_version, {
-				name => $name,
-				reason => 'no version detected'
-			};
-			next;
-		}
-
-		unless (_version_satisfies($found, $op, $ver)) {
-			push @bad_version, {
-				name => $name,
-				reason => "found $found but need $op$ver"
-			};
-			next;
-		}
-	} else {
-		# Unsupported constraint type
-		push @bad_version, {
-			name => $name,
-			reason => "unsupported constraint type: " . ref($want)
-			};
-		next;
-		}
+		# If we got here, the program passed all checks
+		push @checked, $r;
 	}
 
 	return {
 		missing => \@missing,
 		bad_version => \@bad_version,
+		checked => \@checked
 	};
 }
 
