@@ -15,6 +15,7 @@ our %EXPORT_TAGS = ( all => \@EXPORT_OK );
 
 my %VERSION_CACHE;
 my $TEST = Test::Builder->new();
+our $TIMEOUT = 5;	# Seconds
 
 =head1 NAME
 
@@ -392,7 +393,7 @@ sub _capture_version_output {
 		push @flags, qw(/? -?) if $^O eq 'MSWin32';
 	}
 
-	my $timeout = 5;    # seconds; tweakable or make configurable
+	my $timeout = $TIMEOUT;
 
 	for my $flag (@flags) {
 		# Build argv-style command: avoid shell when possible
@@ -417,7 +418,6 @@ sub _capture_version_output {
 					warn "Unexpected probe error while probing: $@";
 				}
 				next;
-				
 			}
 			$ok = defined $out && $out ne '';
 		} else {
