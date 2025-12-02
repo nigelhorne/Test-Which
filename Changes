@@ -1,5 +1,8 @@
 Revision history for Test-Which
 
+0.05
+	Try again with IPC::Run3 if it's installed
+
 0.04	Sat Nov 29 13:26:52 EST 2025
 	"checked" was not being set up
 	Print version found if TEST_VERBOSE is set

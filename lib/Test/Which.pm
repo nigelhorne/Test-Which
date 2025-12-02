@@ -166,7 +166,7 @@ Skip entire test files if requirements aren't met:
 
   use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
 
-  # Test file is skipped if either program is missing or version too old
+  # Test file is skipped if either program is missing or the version is too old
   # No tests below this line will run if requirements aren't met
 
 =head2 Runtime Checking in Subtests
@@ -392,36 +392,67 @@ sub _capture_version_output {
 		push @flags, qw(/? -?) if $^O eq 'MSWin32';
 	}
 
+	my $timeout = 5;    # seconds; tweakable or make configurable
+
 	for my $flag (@flags) {
-		my $out = eval {
-			# Platform-specific command construction
-			my $cmd;
-			if ($flag eq '') {
-				if ($^O eq 'MSWin32') {
-					$cmd = qq{"$path" 2>&1};
-				} else {
-					# Escape the path for shell on Unix
-					my $escaped = $path;
-					$escaped =~ s/'/'\\''/g;
-					$cmd = qq{'$escaped' 2>&1};
+		# Build argv-style command: avoid shell when possible
+		my @cmd = ($path);
+		push @cmd, $flag if defined $flag && length $flag;
+
+		my $out;
+		my $ok;
+
+		if (eval { require IPC::Run3; 1 }) {
+			# Prefer IPC::Run3 to avoid shell and capture stderr
+			eval {
+				local $SIG{ALRM} = sub { die 'TIMEOUT' };
+				alarm $timeout;
+				my ($in, $stdout, $stderr) = ('', '', '');
+				IPC::Run3::run3(\@cmd, \$in, \$stdout, \$stderr);
+				alarm 0;
+				$out = $stdout . $stderr;
+			};
+			if ($@) {
+				if ($@ !~ /TIMEOUT/) {
+					warn "Unexpected probe error while probing: $@";
 				}
+				next;
+				
+			}
+			$ok = defined $out && $out ne '';
+		} else {
+			# Fallback: build a safe shell command (best-effort) and qx it with alarm
+			my $shell_cmd;
+			if ($^O eq 'MSWin32') {
+				# Windows: quote via double quotes
+				my $flagpart = defined $flag ? " $flag" : '';
+				$shell_cmd = qq{"$path"$flagpart 2>&1};
 			} else {
-				if ($^O eq 'MSWin32') {
-					$cmd = qq{"$path" $flag 2>&1};
-				} else {
-					# Escape the path for shell on Unix
-					my $escaped = $path;
-					$escaped =~ s/'/'\\''/g;
-					$cmd = qq{'$escaped' $flag 2>&1};
+				# Unix: single-quote path (escape single quotes inside)
+				my $escaped = $path;
+				$escaped =~ s/'/'\\''/g;
+				my $flagpart = '';
+				if (defined $flag && length $flag) {
+					# flags containing spaces should be used carefully
+					$flagpart = ' ' . $flag;
 				}
+				$shell_cmd = qq{'$escaped'$flagpart 2>&1};
 			}
 
-			my $output = qx{$cmd};
-			return $output;
-		};
+			eval {
+				local $SIG{ALRM} = sub { die 'TIMEOUT' };
+				alarm $timeout;
+				$out = qx{$shell_cmd};
+				alarm 0;
+			};
+			if ($@) {
+				next if $@ =~ /TIMEOUT/;
+				next;
+			}
+			$ok = defined $out && $out ne '';
+		}
 
-		next unless defined $out;
-		next if $out eq '';
+		next unless $ok;
 
 		# Cache and return the result
 		$VERSION_CACHE{$cache_key} = $out;
