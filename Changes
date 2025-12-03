@@ -1,8 +1,8 @@
 Revision history for Test-Which
 
-0.05
+0.05	Wed Dec  3 08:16:44 EST 2025
 	Try again with IPC::Run3 if it's installed
-	Allow timeout to be specified - the default is 5seconds
+	Allow timeout to be specified - the default is 5 seconds
 
 0.04	Sat Nov 29 13:26:52 EST 2025
 	"checked" was not being set up
