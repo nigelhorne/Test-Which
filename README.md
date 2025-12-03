@@ -91,7 +91,8 @@ Some programs use non-standard flags to display version information:
     # Program prints version without any flag
     which_ok 'sometool', {
         version => '>=1.0',
-        version_flag => ''
+        version_flag => '',
+        timeout => 10,    # seconds - the default is 5
     };
 
     # Windows-specific flag
@@ -134,7 +135,7 @@ Skip entire test files if requirements aren't met:
 
     use Test::Which 'ffmpeg' => '>=6.0', 'convert' => '>=7.1';
 
-    # Test file is skipped if either program is missing or version too old
+    # Test file is skipped if either program is missing or the version is too old
     # No tests below this line will run if requirements aren't met
 
 ## Runtime Checking in Subtests

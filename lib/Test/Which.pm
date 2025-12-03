@@ -124,7 +124,8 @@ Some programs use non-standard flags to display version information:
   # Program prints version without any flag
   which_ok 'sometool', {
       version => '>=1.0',
-      version_flag => ''
+      version_flag => '',
+      timeout => 10,	# seconds - the default is 5
   };
 
   # Windows-specific flag
@@ -660,6 +661,10 @@ sub _check_requirements {
 
 			if($version_flag) {
 				$r->{version_flag} = $version_flag;
+			}
+
+			if(exists($want->{'timeout'})) {
+				$TIMEOUT = $want->{'timeout'};
 			}
 
 			if (exists $want->{version}) {
