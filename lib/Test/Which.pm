@@ -396,9 +396,19 @@ sub _capture_version_output {
 
 	my $timeout = $TIMEOUT;
 
+	# Determine if Windows needs cmd.exe wrapper
+	my $needs_cmd_wrapper = ($^O eq 'MSWin32' && $path =~ /\.(bat|cmd)$/i);
+
 	for my $flag (@flags) {
-		# Build argv-style command: avoid shell when possible
-		my @cmd = ($path);
+		#-----------------------------------------
+		# Build command safely (argv-style)
+		#-----------------------------------------
+		my @cmd;
+		if ($needs_cmd_wrapper) {
+			@cmd = ('cmd.exe', '/c', $path);
+		} else {
+			@cmd = ($path);
+		}
 		push @cmd, $flag if defined $flag && length $flag;
 
 		my $out;
@@ -424,7 +434,11 @@ sub _capture_version_output {
 		} else {
 			# Fallback: build a safe shell command (best-effort) and qx it with alarm
 			my $shell_cmd;
-			if ($^O eq 'MSWin32') {
+
+			if ($needs_cmd_wrapper) {
+				my $flagpart = defined $flag ? " $flag" : '';
+				$shell_cmd = qq{cmd.exe /c "$path"$flagpart 2>&1};
+			} elsif ($^O eq 'MSWin32') {
 				# Windows: quote via double quotes
 				my $flagpart = defined $flag ? " $flag" : '';
 				$shell_cmd = qq{"$path"$flagpart 2>&1};
@@ -447,13 +461,16 @@ sub _capture_version_output {
 				alarm 0;
 			};
 			if ($@) {
-				next if $@ =~ /TIMEOUT/;
+				# next if $@ =~ /TIMEOUT/;
 				next;
 			}
 			$ok = defined $out && $out ne '';
 		}
 
 		next unless $ok;
+
+		# Normalize Windows line endings
+		$out =~ s/\r\n/\n/g;
 
 		# Cache and return the result
 		$VERSION_CACHE{$cache_key} = $out;
