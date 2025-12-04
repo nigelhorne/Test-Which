@@ -362,22 +362,18 @@ sub _capture_version_output {
 
 	return undef unless defined $path;
 
-	#--------------------------------------------
 	# Build cache key
-	#--------------------------------------------
 	my $cache_key = $path;
 	if (defined $custom_flags) {
-		if (ref($custom_flags) eq 'ARRAY') {
+		if (ref $custom_flags eq 'ARRAY') {
 			$cache_key .= '|' . join(',', @$custom_flags);
-		} elsif (!ref($custom_flags)) {
+		} elsif (!ref $custom_flags) {
 			$cache_key .= '|' . $custom_flags;
 		}
 	}
 	return $VERSION_CACHE{$cache_key} if exists $VERSION_CACHE{$cache_key};
 
-	#--------------------------------------------
 	# Determine flags to try
-	#--------------------------------------------
 	my @flags;
 	if (!defined $custom_flags) {
 		@flags = qw(--version -version -v -V);
@@ -387,7 +383,7 @@ sub _capture_version_output {
 		@flags = @$custom_flags;
 	}
 	elsif (!ref($custom_flags)) {
-		@flags = ($custom_flags);	 # may be ''
+		@flags = ($custom_flags);	# allow empty string ''
 	}
 	else {
 		warn "Invalid version_flag type: ", ref($custom_flags);
@@ -395,40 +391,37 @@ sub _capture_version_output {
 		return undef;
 	}
 
-	my $timeout = $TIMEOUT;
+	# timeout (default to 5 seconds if not set)
+	my $timeout = defined $TIMEOUT ? $TIMEOUT : 5;
 
-	#--------------------------------------------
-	# Windows batch detection (must wrap correctly)
-	#--------------------------------------------
-	my $is_win  = ($^O eq 'MSWin32');
-	my $is_bat  = ($path =~ /\.(bat|cmd)$/i);
+	my $is_win = ($^O eq 'MSWin32') ? 1 : 0;
+	my $is_bat = ($path =~ /\.(bat|cmd)$/i) ? 1 : 0;
 
-	#--------------------------------------------
-	# For each flag, attempt execution
-	#--------------------------------------------
-	FLAG: for my $flag (@flags) {
-		# argv style command building
+	FLAG:
+	for my $flag (@flags) {
+
+		# Build command / args
 		my @cmd;
-
 		if ($is_win && $is_bat) {
-			# Correct quoting on Windows
-			push @cmd, ('cmd.exe', '/c', qq("$path"));
+			# For .bat/.cmd on Windows, call cmd.exe /c "prog [flag]"
+			# Build a single command string for cmd.exe /c; quote path if it contains spaces
+			my $path_part = ($path =~ /\s/) ? qq{"$path"} : $path;
+			my $cmdstr = $path_part;
+			$cmdstr .= " $flag" if defined $flag && length $flag;
+			@cmd = ('cmd.exe', '/c', $cmdstr);
 		} else {
-			push @cmd, $path;
+			# Normal argv-style call for binaries / scripts
+			@cmd = ($path);
+			push @cmd, $flag if defined $flag && length $flag;
 		}
-
-		# Append version flag (may be empty string)
-		push @cmd, $flag if defined $flag && length $flag;
 
 		my ($stdout, $stderr) = ('', '');
 		my $ok = 0;
 
-		#--------------------------------------------
-		# Try IPC::Run3 (no shell, portable)
-		#--------------------------------------------
+		# Try IPC::Run3 (preferred) in argv-mode
 		if (eval { require IPC::Run3; 1 }) {
 			eval {
-				local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+				local $SIG{ALRM} = sub { die 'TIMEOUT' };
 				alarm $timeout;
 				IPC::Run3::run3(\@cmd, \undef, \$stdout, \$stderr);
 				alarm 0;
@@ -440,54 +433,59 @@ sub _capture_version_output {
 			$ok = ($stdout ne '' || $stderr ne '');
 		}
 
-		#--------------------------------------------
-		# Fallback: shell execution
-		#--------------------------------------------
+		# Fallback to shell qx{} if IPC::Run3 not available or produced no output
 		if (!$ok) {
 			my $shell_cmd;
-
-			if ($is_win) {
-				my $f = defined($flag) && length($flag) ? " $flag" : "";
-				$shell_cmd = qq{cmd.exe /c "$path"$f 2>&1};
+			if ($is_win && $is_bat) {
+				# Use cmd.exe /c "prog [flag]" and capture stderr
+				my $path_part = ($path =~ /\s/) ? qq{"$path"} : $path;
+				my $inner = $path_part;
+				$inner .= " $flag" if defined $flag && length $flag;
+				$shell_cmd = qq{cmd.exe /c "$inner" 2>&1};
+			}
+			elsif ($is_win) {
+				# Non-bat on Windows — quote path and append flag
+				my $flagpart = defined $flag && length $flag ? " $flag" : '';
+				$shell_cmd = qq{"$path"$flagpart 2>&1};
 			}
 			else {
-				# POSIX quoting
+				# Unix: single-quote the path; if flag present pass it unquoted (shell will split)
 				my $escaped = $path;
 				$escaped =~ s/'/'\\''/g;
-
-				if (defined($flag) && length($flag)) {
+				if (defined $flag && length $flag) {
+					# If flag contains spaces, shell will treat it as one word if quoted; use simple approach
 					my $f = $flag;
 					$f =~ s/'/'\\''/g;
-					$shell_cmd = "'$escaped' '$f' 2>&1";
+					$shell_cmd = qq{'$escaped' '$f' 2>&1};
 				} else {
-					$shell_cmd = "'$escaped' 2>&1";
+					$shell_cmd = qq{'$escaped' 2>&1};
 				}
 			}
 
 			eval {
-				local $SIG{ALRM} = sub { die "TIMEOUT\n" };
+				local $SIG{ALRM} = sub { die 'TIMEOUT' };
 				alarm $timeout;
 				$stdout = qx{$shell_cmd};
 				alarm 0;
 			};
 			next FLAG if $@;
-
 			$ok = ($stdout ne '');
 		}
 
 		next FLAG unless $ok;
 
-		# Merge — stdout contains all for fallback, run3 merged above
+		# Merge outputs (IPC::Run3 already gave us stderr separately)
 		my $output = $stdout . $stderr;
 
-		# normalize newlines on Windows
+		# Normalize newlines on Windows
 		$output =~ s/\r\n/\n/g if $is_win;
 
+		# Cache and return
 		$VERSION_CACHE{$cache_key} = $output;
 		return $output;
 	}
 
-	# nothing worked → cache failure
+	# Nothing worked — cache failure
 	$VERSION_CACHE{$cache_key} = undef;
 	return undef;
 }
