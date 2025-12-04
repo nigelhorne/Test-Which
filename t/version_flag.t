@@ -6,6 +6,13 @@ use File::Temp qw(tempdir);
 use File::Spec;
 use File::Which qw(which);
 
+BEGIN {
+	# FIXME
+	if ($^O eq 'MSWin32') {
+		plan skip_all => 'Shell script mock programs not compatible with Windows';
+	}
+}
+
 my $tempdir = tempdir(CLEANUP => 1);
 my $path_sep = $^O eq 'MSWin32' ? ';' : ':';
 $ENV{PATH} = "$tempdir$path_sep$ENV{PATH}";
@@ -37,8 +44,7 @@ sub create_mock_program {
 		print $fh "exit /b 0\r\n";
 
 		close $fh;
-	}
-	else {
+	} else {
 		# Unix shell script
 		$path = File::Spec->catfile($tempdir, $name);
 		open my $fh, '>', $path or die "Cannot create $path: $!";

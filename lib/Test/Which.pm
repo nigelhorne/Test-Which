@@ -866,7 +866,9 @@ L<Test::Builder> - Used for test integration
 =over 4
 
 =item * Version detection is heuristic-based and may fail for programs with
-unusual output formats. Use custom C<version_flag> or C<extractor> for such cases.
+unusual output formats.
+Use custom C<version_flag> or C<extractor> for such cases,
+though even those may break.
 
 =item * No built-in timeout for program execution. Hanging programs will hang tests.
 

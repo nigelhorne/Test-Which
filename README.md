@@ -288,7 +288,9 @@ This module is provided as-is without any warranty.
 # LIMITATIONS
 
 - Version detection is heuristic-based and may fail for programs with
-unusual output formats. Use custom `version_flag` or `extractor` for such cases.
+unusual output formats.
+Use custom `version_flag` or `extractor` for such cases,
+though even those may break.
 - No built-in timeout for program execution. Hanging programs will hang tests.
 - Cache persists for process lifetime - updated programs won't be re-detected
 without restarting the test process.
