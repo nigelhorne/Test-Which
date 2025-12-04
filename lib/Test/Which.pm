@@ -360,10 +360,11 @@ sub which_ok {
 sub _capture_version_output {
 	my ($path, $custom_flags) = @_;
 
-	# Return undef immediately if path is not defined
 	return undef unless defined $path;
 
-	# Create cache key from path and flags
+	#--------------------------------------------
+	# Build cache key
+	#--------------------------------------------
 	my $cache_key = $path;
 	if (defined $custom_flags) {
 		if (ref($custom_flags) eq 'ARRAY') {
@@ -372,122 +373,121 @@ sub _capture_version_output {
 			$cache_key .= '|' . $custom_flags;
 		}
 	}
-
-	# Return cached result if available
 	return $VERSION_CACHE{$cache_key} if exists $VERSION_CACHE{$cache_key};
 
-	# Determine which flags to try
+	#--------------------------------------------
+	# Determine flags to try
+	#--------------------------------------------
 	my @flags;
-	if (defined $custom_flags) {
-		if (ref($custom_flags) eq 'ARRAY') {
-			@flags = @$custom_flags;
-		} elsif (!ref($custom_flags)) {
-			@flags = ($custom_flags);
-		} else {
-			warn 'Invalid version_flag type: ', ref($custom_flags);
-			$VERSION_CACHE{$cache_key} = undef;
-			return undef;
-		}
-	} else {
+	if (!defined $custom_flags) {
 		@flags = qw(--version -version -v -V);
-		# Add Windows-specific flags
 		push @flags, qw(/? -?) if $^O eq 'MSWin32';
+	}
+	elsif (ref($custom_flags) eq 'ARRAY') {
+		@flags = @$custom_flags;
+	}
+	elsif (!ref($custom_flags)) {
+		@flags = ($custom_flags);	 # may be ''
+	}
+	else {
+		warn "Invalid version_flag type: ", ref($custom_flags);
+		$VERSION_CACHE{$cache_key} = undef;
+		return undef;
 	}
 
 	my $timeout = $TIMEOUT;
 
-	# Determine if Windows needs cmd.exe wrapper
-	my $needs_cmd_wrapper = ($^O eq 'MSWin32' && $path =~ /\.(bat|cmd)$/i);
+	#--------------------------------------------
+	# Windows batch detection (must wrap correctly)
+	#--------------------------------------------
+	my $is_win  = ($^O eq 'MSWin32');
+	my $is_bat  = ($path =~ /\.(bat|cmd)$/i);
 
-	for my $flag (@flags) {
-		#-----------------------------------------
-		# Build command safely (argv-style)
-		#-----------------------------------------
+	#--------------------------------------------
+	# For each flag, attempt execution
+	#--------------------------------------------
+	FLAG: for my $flag (@flags) {
+		# argv style command building
 		my @cmd;
-		if ($needs_cmd_wrapper) {
-			@cmd = ('cmd.exe', '/c', qq{"$path"});
+
+		if ($is_win && $is_bat) {
+			# Correct quoting on Windows
+			push @cmd, ('cmd.exe', '/c', qq("$path"));
 		} else {
-			@cmd = ($path);
+			push @cmd, $path;
 		}
+
+		# Append version flag (may be empty string)
 		push @cmd, $flag if defined $flag && length $flag;
 
-		# Windows: batch files receive arguments wrapped in quotes.
-		# Strip quotes to avoid: "%1" != "-show-ver"
-		if ($^O eq 'MSWin32') {
-			@cmd = map {
-				my $x = $_;
-				$x =~ s/^"(.*)"$/$1/;   # remove surrounding "
-				$x
-			} @cmd;
-		}
+		my ($stdout, $stderr) = ('', '');
+		my $ok = 0;
 
-		my $out;
-		my $ok;
-
+		#--------------------------------------------
+		# Try IPC::Run3 (no shell, portable)
+		#--------------------------------------------
 		if (eval { require IPC::Run3; 1 }) {
-			# Prefer IPC::Run3 to avoid shell and capture stderr
 			eval {
-				local $SIG{ALRM} = sub { die 'TIMEOUT' };
+				local $SIG{ALRM} = sub { die "TIMEOUT\n" };
 				alarm $timeout;
-				my ($in, $stdout, $stderr) = ('', '', '');
-				IPC::Run3::run3(\@cmd, \$in, \$stdout, \$stderr);
+				IPC::Run3::run3(\@cmd, \undef, \$stdout, \$stderr);
 				alarm 0;
-				$out = $stdout . $stderr;
 			};
 			if ($@) {
-				if ($@ !~ /TIMEOUT/) {
-					warn "Unexpected probe error while probing: $@";
-				}
-				next;
+				next FLAG if $@ =~ /TIMEOUT/;
+				next FLAG;
 			}
-			$ok = defined $out && $out ne '';
-		} else {
-			# Fallback: build a safe shell command (best-effort) and qx it with alarm
+			$ok = ($stdout ne '' || $stderr ne '');
+		}
+
+		#--------------------------------------------
+		# Fallback: shell execution
+		#--------------------------------------------
+		if (!$ok) {
 			my $shell_cmd;
 
-			if ($needs_cmd_wrapper) {
-				my $flagpart = defined $flag ? " $flag" : '';
-				$shell_cmd = qq{cmd.exe /c "$path"$flagpart 2>&1};
-			} elsif ($^O eq 'MSWin32') {
-				# Windows: quote via double quotes
-				my $flagpart = defined $flag ? " $flag" : '';
-				$shell_cmd = qq{"$path"$flagpart 2>&1};
-			} else {
-				# Unix: single-quote path (escape single quotes inside)
+			if ($is_win) {
+				my $f = defined($flag) && length($flag) ? " $flag" : "";
+				$shell_cmd = qq{cmd.exe /c "$path"$f 2>&1};
+			}
+			else {
+				# POSIX quoting
 				my $escaped = $path;
 				$escaped =~ s/'/'\\''/g;
-				my $flagpart = '';
-				if (defined $flag && length $flag) {
-					# flags containing spaces should be used carefully
-					$flagpart = ' ' . $flag;
+
+				if (defined($flag) && length($flag)) {
+					my $f = $flag;
+					$f =~ s/'/'\\''/g;
+					$shell_cmd = "'$escaped' '$f' 2>&1";
+				} else {
+					$shell_cmd = "'$escaped' 2>&1";
 				}
-				$shell_cmd = qq{'$escaped'$flagpart 2>&1};
 			}
 
 			eval {
-				local $SIG{ALRM} = sub { die 'TIMEOUT' };
+				local $SIG{ALRM} = sub { die "TIMEOUT\n" };
 				alarm $timeout;
-				$out = qx{$shell_cmd};
+				$stdout = qx{$shell_cmd};
 				alarm 0;
 			};
-			if ($@) {
-				# next if $@ =~ /TIMEOUT/;
-				next;
-			}
-			$ok = defined $out && $out ne '';
+			next FLAG if $@;
+
+			$ok = ($stdout ne '');
 		}
 
-		next unless $ok;
+		next FLAG unless $ok;
 
-		# Normalize Windows line endings
-		$out =~ s/\r\n/\n/g;
+		# Merge — stdout contains all for fallback, run3 merged above
+		my $output = $stdout . $stderr;
 
-		# Cache and return the result
-		$VERSION_CACHE{$cache_key} = $out;
-		return $out;
+		# normalize newlines on Windows
+		$output =~ s/\r\n/\n/g if $is_win;
+
+		$VERSION_CACHE{$cache_key} = $output;
+		return $output;
 	}
 
-	# Cache the failure (undef) so we don't keep retrying
+	# nothing worked → cache failure
 	$VERSION_CACHE{$cache_key} = undef;
 	return undef;
 }
