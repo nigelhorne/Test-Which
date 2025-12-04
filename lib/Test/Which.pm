@@ -411,6 +411,16 @@ sub _capture_version_output {
 		}
 		push @cmd, $flag if defined $flag && length $flag;
 
+		# Windows: batch files receive arguments wrapped in quotes.
+		# Strip quotes to avoid: "%1" != "-show-ver"
+		if ($^O eq 'MSWin32') {
+			@cmd = map {
+				my $x = $_;
+				$x =~ s/^"(.*)"$/$1/;   # remove surrounding "
+				$x
+			} @cmd;
+		}
+
 		my $out;
 		my $ok;
 
