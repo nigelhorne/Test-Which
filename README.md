@@ -4,7 +4,7 @@ Test::Which - Skip tests if external programs are missing from PATH (with versio
 
 # VERSION
 
-Version 0.05
+Version 0.06
 
 # SYNOPSIS
 
