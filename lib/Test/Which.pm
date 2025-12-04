@@ -405,7 +405,7 @@ sub _capture_version_output {
 		#-----------------------------------------
 		my @cmd;
 		if ($needs_cmd_wrapper) {
-			@cmd = ('cmd.exe', '/c', $path);
+			@cmd = ('cmd.exe', '/c', qq{"$path"});
 		} else {
 			@cmd = ($path);
 		}
