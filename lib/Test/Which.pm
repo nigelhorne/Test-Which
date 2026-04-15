@@ -23,11 +23,11 @@ Test::Which - Skip tests if external programs are missing from PATH (with versio
 
 =head1 VERSION
 
-Version 0.06
+Version 0.07
 
 =cut
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 =head1 SYNOPSIS
 
